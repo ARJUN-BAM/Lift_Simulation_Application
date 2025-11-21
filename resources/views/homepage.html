@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Lift Simulator UI</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f0f2f5;
+            padding: 20px;
+        }
+        h2 {
+            margin-top: 30px;
+        }
+        .card {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        input, select, button {
+            padding: 10px;
+            margin: 5px 0;
+            width: 100%;
+            font-size: 16px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        #responseBox {
+            background: black;
+            color: #0f0;
+            padding: 15px;
+            min-height: 150px;
+            border-radius: 5px;
+            font-family: "Courier New", monospace;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Lift Simulator UI</h1>
+
+    <!-- Call Lift -->
+    <div class="card">
+        <h2>Call Lift</h2>
+        <label>Current Floor:</label>
+        <input type="number" id="currentFloor">
+
+        <label>Direction:</label>
+        <select id="direction">
+            <option value="up">Up</option>
+            <option value="down">Down</option>
+        </select>
+
+        <button onclick="callLift()">Call Lift</button>
+    </div>
+
+    <!-- Set Destinations -->
+    <div class="card">
+        <h2>Set Lift Destinations</h2>
+        <label>Lift ID:</label>
+        <input type="number" id="destLiftId">
+
+        <label>Destinations (comma separated):</label>
+        <input type="text" id="destinations">
+
+        <button onclick="setDestinations()">Set Destinations</button>
+    </div>
+
+    <!-- Cancel Destinations -->
+    <div class="card">
+        <h2>Cancel Lift Destinations</h2>
+        <label>Lift ID:</label>
+        <input type="number" id="cancelLiftId">
+
+        <label>Destinations to Cancel (comma separated):</label>
+        <input type="text" id="cancelDestinations">
+
+        <button onclick="cancelDestinations()">Cancel Destinations</button>
+    </div>
+
+    <!-- Response -->
+    <h2>API Response</h2>
+    <div id="responseBox">Waiting for actions...</div>
+
+<script>
+const API_BASE = "http://127.0.0.1:8000/api";
+
+function showResponse(data) {
+    document.getElementById("responseBox").innerText = JSON.stringify(data, null, 4);
+}
+
+async function callLift() {
+    const current_floor = parseInt(document.getElementById("currentFloor").value);
+    const direction = document.getElementById("direction").value;
+
+    const response = await fetch(`${API_BASE}/lifts`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ current_floor, direction })
+    });
+
+    showResponse(await response.json());
+}
+
+async function setDestinations() {
+    const liftId = document.getElementById("destLiftId").value;
+    const destinations = document.getElementById("destinations").value
+        .split(",")
+        .map(x => parseInt(x.trim()))
+        .filter(x => !isNaN(x));
+
+    const response = await fetch(`${API_BASE}/lifts/${liftId}`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ destinations })
+    });
+
+    showResponse(await response.json());
+}
+
+async function cancelDestinations() {
+    const liftId = document.getElementById("cancelLiftId").value;
+    const destinations = document.getElementById("cancelDestinations").value
+        .split(",")
+        .map(x => parseInt(x.trim()))
+        .filter(x => !isNaN(x));
+
+    const response = await fetch(`${API_BASE}/lifts/${liftId}/cancel`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ destinations })
+    });
+
+    showResponse(await response.json());
+}
+</script>
+
+</body>
+</html>
