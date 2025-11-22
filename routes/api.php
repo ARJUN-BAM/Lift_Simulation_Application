@@ -5,5 +5,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/lifts', [LiftController::class, 'requestLift']);
 Route::post('/lifts/{id}', [LiftController::class, 'insideLift']);
-Route::get('/lifts/status', [LiftController::class, 'status']);
-Route::post('/lifts/{id}/cancel',[LiftController::class,'cancelLift']);
+Route::post('/lifts/{id}/cancel', [LiftController::class, 'cancelLift']);
+Route::get('/lifts/all-lifts', [LiftController::class, 'getAllLifts']);
+
+// Route::view("/", "welcome");

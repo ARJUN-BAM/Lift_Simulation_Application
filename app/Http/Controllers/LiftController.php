@@ -95,13 +95,7 @@ class LiftController extends Controller
     }
 
 
-    public function status()
-    {
-        return response()->json([
-            'lifts' => json_decode(file_get_contents(storage_path('app/lifts.json')), true),
-            'requests' => json_decode(file_get_contents(storage_path('app/requestList.json')), true)
-        ]);
-    }
+
     private function calculateArrivalTime($lift, $requestFloor)
     {
         $floorTime = 3;    // seconds per floor
@@ -204,6 +198,21 @@ class LiftController extends Controller
             'lift_id' => $id,
             'removed' => $destinations,
             'queue' => $lifts[$index]['queue']
+        ]);
+    }
+
+    public function getAllLifts()
+    {
+        $liftsPath = storage_path('app/lifts.json');
+
+        if (!file_exists($liftsPath)) {
+            return response()->json(['error' => 'lifts data not found'], 500);
+        }
+
+        $lifts = json_decode(file_get_contents($liftsPath), true);
+
+        return response()->json([
+            'lifts' => $lifts
         ]);
     }
 }
