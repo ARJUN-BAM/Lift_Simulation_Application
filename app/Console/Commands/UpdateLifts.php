@@ -97,10 +97,10 @@ class UpdateLifts extends Command
     {
         if (!file_exists($this->liftsPath)) {
             file_put_contents($this->liftsPath, json_encode([
-                ["id" => 1, "position" => -3, "direction" => "idle", "queue" => []],
-                ["id" => 2, "position" => -3, "direction" => "idle", "queue" => []],
-                ["id" => 3, "position" => -3, "direction" => "idle", "queue" => []],
-                ["id" => 4, "position" => -3, "direction" => "idle", "queue" => []]
+                ["id" => 1, "position" => -4, "direction" => "idle", "queue" => []],
+                ["id" => 2, "position" => -4, "direction" => "idle", "queue" => []],
+                ["id" => 3, "position" => -4, "direction" => "idle", "queue" => []],
+                ["id" => 4, "position" => -4, "direction" => "idle", "queue" => []]
             ], JSON_PRETTY_PRINT));
         }
 
