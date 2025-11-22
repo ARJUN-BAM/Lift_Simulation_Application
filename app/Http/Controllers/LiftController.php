@@ -22,7 +22,7 @@ class LiftController extends Controller
             return response()->json(['error' => 'invalid direction'], 400);
         }
 
-        if ($floor < -4 || $floor > 16) {
+        if ($floor < config('constants.MIN_FLOOR') || $floor > config('constants.MAX_FLOOR')) {
             return response()->json(['error' => 'floor out of range'], 400);
         }
 
@@ -108,8 +108,8 @@ class LiftController extends Controller
 
     private function calculateArrivalTime($lift, $requestFloor)
     {
-        $floorTime = 3;    // seconds per floor
-        $doorTime  = 1.5;  // door open/close time
+        $floorTime = config('constants.LIFT_TRAVELLING_TIME');    // seconds per floor
+        $doorTime  = config('constants.LIFT_OPENING_TIME') + config('constants.LIFT_CLOSING_TIME');  // door open/close time
 
         $pos = $lift['position'];
         $dir = $lift['direction'];

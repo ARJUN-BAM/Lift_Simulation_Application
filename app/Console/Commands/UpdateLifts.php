@@ -74,7 +74,7 @@ class UpdateLifts extends Command
 
                 if ($lift['position'] == $target) {
                     array_shift($lift['queue']);
-                    usleep(3000000); // 1.5s door simulation
+                    usleep((config('constants.LIFT_OPENING_TIME') + config('constants.LIFT_CLOSING_TIME')) * 1000000); // 1.5s door simulation
                 }
 
                 if (empty($lift['queue'])) {
@@ -89,7 +89,7 @@ class UpdateLifts extends Command
             flock($lockFp, LOCK_UN);
             fclose($lockFp);
 
-            sleep(5);
+            sleep(config('constants.LIFT_TRAVELLING_TIME'));
         }
     }
 

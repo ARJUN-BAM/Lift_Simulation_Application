@@ -83,7 +83,7 @@
 
         .floor-label {
             opacity: 0.8;
-            font-size: 20px;
+            font-size: 15px;
         }
 
         .floor-cell.active {
