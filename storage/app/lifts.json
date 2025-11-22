@@ -1,25 +1,25 @@
 [
     {
         "id": 1,
-        "position": 6,
+        "position": -1,
         "direction": "idle",
         "queue": []
     },
     {
         "id": 2,
-        "position": 1,
-        "direction": "idle",
-        "queue": []
-    },
-    {
-        "id": 3,
         "position": 6,
         "direction": "idle",
         "queue": []
     },
     {
+        "id": 3,
+        "position": 5,
+        "direction": "idle",
+        "queue": []
+    },
+    {
         "id": 4,
-        "position": 2,
+        "position": 10,
         "direction": "idle",
         "queue": []
     }
