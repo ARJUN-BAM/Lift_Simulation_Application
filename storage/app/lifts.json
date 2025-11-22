@@ -7,13 +7,13 @@
     },
     {
         "id": 2,
-        "position": 6,
+        "position": 5,
         "direction": "idle",
         "queue": []
     },
     {
         "id": 3,
-        "position": 5,
+        "position": 6,
         "direction": "idle",
         "queue": []
     },
