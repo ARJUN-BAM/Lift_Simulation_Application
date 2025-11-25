@@ -7,7 +7,7 @@ use Illuminate\Console\Command;
 class UpdateLifts extends Command
 {
     protected $signature = 'lifts:engine';
-    protected $description = 'Simulates 4 lifts moving every 3s with FIFO requests, dedupe, door timing and safe file locking';
+    protected $description = 'Simulates 4 lifts movement & request assignment with locking';
 
     private $liftsPath;
     private $requestListPath;
@@ -16,82 +16,97 @@ class UpdateLifts extends Command
     public function __construct()
     {
         parent::__construct();
-
-        $this->liftsPath = storage_path('app/lifts.json');
+        $this->liftsPath       = storage_path('app/lifts.json');
         $this->requestListPath = storage_path('app/requestList.json');
-        $this->lockPath = storage_path('app/lifts.lock');
+        $this->lockPath        = storage_path('app/lifts.lock');
     }
 
     public function handle()
     {
         $this->ensureFiles();
-
-        $this->info("Lift engine running. CTRL+C to stop.");
+        $this->info("Lift engine running...");
 
         while (true) {
 
+            /** LOCK for safe read/update */
             $lockFp = fopen($this->lockPath, 'c+');
             flock($lockFp, LOCK_EX);
+            // $this->info("Engine tick: " . now());
 
-            $lifts = json_decode(file_get_contents($this->liftsPath), true);
+            $lifts    = json_decode(file_get_contents($this->liftsPath), true);
             $requests = json_decode(file_get_contents($this->requestListPath), true);
 
-            // Assign FIFO requests
+            /** Normalize queue format */
+            foreach ($lifts as &$l) {
+                foreach ($l['queue'] as &$q) {
+                    if (is_int($q)) {
+                        $q = ['reqFloor' => $q, 'reqDirection' => null];
+                    }
+                }
+            }
+            unset($l, $q);
+
+            /** Assign requests */
             $remaining = [];
             foreach ($requests as $req) {
-                $assigned = $this->assignRequest($req, $lifts);
-                if (!$assigned) $remaining[] = $req;
+                if (!$this->assignRequest($req, $lifts)) {
+                    $remaining[] = $req;
+                }
             }
             $requests = $remaining;
 
-            // Move each lift
+            /** MOVE each lift */
             foreach ($lifts as &$lift) {
 
                 if (empty($lift['queue'])) {
-                    $lift['direction'] = 'idle';
+                    $lift['direction'] = "idle";
                     continue;
                 }
 
-                $lift['queue'] = $this->reorderQueue(
-                    $lift['queue'],
-                    $lift['position'],
-                    $lift['direction']
-                );
+                /** Maintain queue order */
+                $lift['queue'] = $this->reorderQueue($lift['queue'], $lift['position'], $lift['direction']);
+                $target = $lift['queue'][0]['reqFloor'];
 
-                $target = $lift['queue'][0];
-
-                if ($lift['direction'] === 'idle') {
-                    $lift['direction'] = $lift['position'] < $target ? 'up' : 'down';
+                /** Lift direction must always come from request direction */
+                if (!empty($lift['queue'][0]['reqDirection'])) {
+                    $lift['direction'] = $lift['queue'][0]['reqDirection'];
                 }
 
+                /** Move ONE FLOOR toward target */
                 if ($lift['position'] < $target) {
-                    $lift['position'] += 1;
-                    $lift['direction'] = 'up';
+                    $lift['position']++;
                 } elseif ($lift['position'] > $target) {
-                    $lift['position'] -= 1;
-                    $lift['direction'] = 'down';
+                    $lift['position']--;
                 }
+                var_dump($lift);
+                file_put_contents($this->liftsPath, json_encode($lifts, JSON_PRETTY_PRINT));
 
+                // $this->info("Saved lifts.json at " . now());
+
+
+                /** Arrived at destination */
                 if ($lift['position'] == $target) {
                     array_shift($lift['queue']);
-                    usleep((config('constants.LIFT_OPENING_TIME') + config('constants.LIFT_CLOSING_TIME')) * 1000000); // 1.5s door simulation
+                    usleep((config('constants.LIFT_OPENING_TIME') + config('constants.LIFT_CLOSING_TIME')) * 1000000);
                 }
 
                 if (empty($lift['queue'])) {
-                    $lift['direction'] = 'idle';
+                    $lift['direction'] = "idle";
                 }
             }
             unset($lift);
 
             file_put_contents($this->liftsPath, json_encode($lifts, JSON_PRETTY_PRINT));
-            file_put_contents($this->requestListPath, json_encode($requests, JSON_PRETTY_PRINT));
-
-            flock($lockFp, LOCK_UN);
+            flock($lockFp, LOCK_UN); // release finally
             fclose($lockFp);
 
+
+            /** Wait before next movement step */
             sleep(config('constants.LIFT_TRAVELLING_TIME'));
         }
     }
+
+
 
     private function ensureFiles()
     {
@@ -129,36 +144,31 @@ class UpdateLifts extends Command
 
             if ($lift['direction'] === 'idle') {
                 $dist = abs($lift['position'] - $floor);
-                if ($dist < $bestDist) {
-                    $bestDist = $dist;
-                    $best = $i;
-                }
-                continue;
+            } elseif (
+                $lift['direction'] === $dir &&
+                (($dir === 'up'   && $lift['position'] <= $floor) ||
+                    ($dir === 'down' && $lift['position'] >= $floor))
+            ) {
+                $dist = abs($lift['position'] - $floor);
+            } else {
+                $dist = abs($lift['position'] - $floor) + 100;
             }
 
-            if ($lift['direction'] === $dir) {
-                if (
-                    $dir === 'up'   && $lift['position'] <= $floor ||
-                    $dir === 'down' && $lift['position'] >= $floor
-                ) {
-
-                    $dist = abs($lift['position'] - $floor);
-                    if ($dist < $bestDist) {
-                        $bestDist = $dist;
-                        $best = $i;
-                    }
-                }
+            if ($dist < $bestDist) {
+                $bestDist = $dist;
+                $best = $i;
             }
         }
 
         if ($best === null) return false;
 
-        if (!$this->hasFloor($lifts[$best]['queue'], $floor)) {
-            $lifts[$best]['queue'][] = $floor;
+        $lifts[$best]['queue'][] = [
+            'reqFloor' => $floor,
+            'reqDirection' => $dir
+        ];
 
-            if ($lifts[$best]['direction'] === 'idle') {
-                $lifts[$best]['direction'] = $lifts[$best]['position'] < $floor ? 'up' : 'down';
-            }
+        if ($lifts[$best]['direction'] === "idle") {
+            $lifts[$best]['direction'] = $lifts[$best]['position'] < $floor ? "up" : "down";
         }
 
         return true;
@@ -168,31 +178,34 @@ class UpdateLifts extends Command
     {
         if (empty($queue)) return [];
 
-        if ($direction === 'idle') {
-            $direction = $queue[0] >= $pos ? 'up' : 'down';
+        if ($direction === "idle") {
+            $direction = $queue[0]['reqFloor'] >= $pos ? "up" : "down";
         }
 
         $same = [];
-        $opp = [];
+        $opp  = [];
 
-        foreach ($queue as $floor) {
-            if ($direction === 'up') {
-                ($floor >= $pos) ? $same[] = $floor : $opp[] = $floor;
+        foreach ($queue as $item) {
+            $floor = $item['reqFloor'];
+            if ($direction === "up") {
+                ($floor >= $pos) ? $same[] = $item : $opp[] = $item;
             } else {
-                ($floor <= $pos) ? $same[] = $floor : $opp[] = $floor;
+                ($floor <= $pos) ? $same[] = $item : $opp[] = $item;
             }
         }
 
-        if ($direction === 'up') sort($same);
-        if ($direction === 'down') rsort($same);
-
-        sort($opp);
+        if ($direction === "up")  usort($same, fn($a, $b) => $a['reqFloor'] <=> $b['reqFloor']);
+        if ($direction === "down") usort($same, fn($a, $b) => $b['reqFloor'] <=> $a['reqFloor']);
+        usort($opp, fn($a, $b) => $a['reqFloor'] <=> $b['reqFloor']);
 
         return array_merge($same, $opp);
     }
 
     private function hasFloor($queue, $floor)
     {
-        return in_array($floor, $queue);
+        foreach ($queue as $item) {
+            if ($item['reqFloor'] == $floor) return true;
+        }
+        return false;
     }
 }
